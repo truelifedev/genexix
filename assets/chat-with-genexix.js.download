@@ -1,0 +1,106 @@
+const closeBtn = document.querySelector(".close-btn");
+const chatbox = document.querySelector(".chatbox");
+const chatInput = document.querySelector(".chat-input textarea");
+const sendChatBtn = document.querySelector(".chat-input span");
+const chatHeader = document.querySelector(".chat-header");
+const noticeChat = document.querySelector(".notice");
+
+let userMessage = null;
+const inputInitHeight = chatInput.scrollHeight;
+let chatHistory = [];
+const createChatLi = (message, className) => {
+    const chatLi = document.createElement("li");
+    chatLi.classList.add("chat", `${className}`);
+    let chatContent = className === "outgoing" ? `<p></p>` : `
+    <div><img src="assets/logo.png" alt="" srcset=""></div>
+    <p></p>`;
+    chatLi.innerHTML = chatContent;
+    chatLi.querySelector("p").innerHTML = message;
+    return chatLi;
+}
+const generateResponse = (chatElement) => {
+    const API_URL = "https://genexix-chatbot-api-production.up.railway.app";
+    // const API_URL = "http://localhost:5552";
+
+    const messageElement = chatElement.querySelector("p");
+
+    const requestOptions = {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+            { message: userMessage },
+        )
+    }
+    chatHistory.push(["user", userMessage]);
+    fetch(API_URL, requestOptions).then(res => res.json()).then(data => {
+        if (data.message == null) {
+            fetch(`${API_URL}/chatbot`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(
+                    {
+                        message: userMessage,
+                        chatHistory
+                    },
+                )
+            }).then((res) => res.json()).then(data => {
+                if (!data.error) {
+                    chatHistory.push(["assistant", data.message]);
+                }
+                messageElement.textContent = data.message.trim();
+            }).catch((e) => {
+                messageElement.classList.add("error");
+                messageElement.textContent = "Something went wrong. Please try again.";
+            }).finally(() => chatbox.scrollTo(0, chatbox.scrollHeight));
+        }
+        else {
+            messageElement.textContent = data.message.trim();
+        }
+    }).catch((e) => {
+        console.log(e);
+        messageElement.classList.add("error");
+        messageElement.textContent = "Oops! Something went wrong. Please try again.";
+    }).finally(() => chatbox.scrollTo(0, chatbox.scrollHeight));
+}
+
+const handleChat = () => {
+    userMessage = chatInput.value.trim();
+    if (!userMessage) return;
+
+    // Clear the input textarea and set its height to default
+    chatInput.value = "";
+    chatInput.style.height = `${inputInitHeight}px`;
+
+    // Append the user's message to the chatbox
+    chatbox.appendChild(createChatLi(userMessage, "outgoing"));
+    chatbox.scrollTo(0, chatbox.scrollHeight);
+
+    setTimeout(() => {
+        const incomingChatLi = createChatLi("...", "incoming");
+        chatbox.appendChild(incomingChatLi);
+        chatbox.scrollTo(0, chatbox.scrollHeight);
+        generateResponse(incomingChatLi);
+    }, 600);
+}
+
+chatInput.addEventListener("input", () => {
+    chatInput.style.height = `${inputInitHeight}px`;
+    chatInput.style.height = `${chatInput.scrollHeight}px`;
+});
+
+chatInput.addEventListener("keydown", (e) => {
+    // If Enter key is pressed without Shift key and the window 
+    // width is greater than 800px, handle the chat
+    if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 800) {
+        e.preventDefault();
+        handleChat();
+    }
+});
+
+sendChatBtn.addEventListener("click", handleChat);
+// closeBtn.addEventListener("click", () => document.body.classList.remove("show-chatbot"));
+// chatbotToggler.addEventListener("click", () => document.body.classList.toggle("show-chatbot"));
